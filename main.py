@@ -5,6 +5,7 @@ import numpy as np
 import wave
 import time
 import datetime
+import os
 # Initialize pygame
 pygame.init()
 
@@ -86,6 +87,8 @@ class Column:
                 self.font = pygame.font.Font('Halftone Font.ttf', self.font_size)  # Create new font with increased size
                 self.growth_timer = pygame.time.get_ticks()
 
+
+
 def get_audio_input_stream(callback):
     p = pyaudio.PyAudio()
     stream = p.open(format=pyaudio.paInt16, channels=1, rate=44100, input=True, frames_per_buffer=1024, stream_callback=callback)
@@ -106,176 +109,195 @@ def draw_waveform(screen, audio_data, raining, split_screen):
             y = max(0, HEIGHT//2 - height//2)  # Ensure y is never less than 0
             for j, color in enumerate(glow_colors):  # Draw multiple ellipses for the glow effect
                 pygame.draw.ellipse(screen, color, (i * step_size + 2 + j, y + j, radius*2 - 2*j, height - 2*j))  # Draw ellipse
-    # else:
-    #    pygame.draw.line(screen, WHITE, (0, HEIGHT//2), (WIDTH // 2 if split_screen else WIDTH, HEIGHT//2), 2)  # Draw a pink line
-# class Button:
-#     def __init__(self, x, y, w, h, text):
-#         self.rect = pygame.Rect(x, y, w, h)
-#         self.text = text
+  
 
-#     def draw(self, screen, split_screen):
-#         if split_screen:
-#             # Adjust the position of the button for split screen
-#             rect = pygame.Rect(self.rect.x // 2, self.rect.y, self.rect.w // 2, self.rect.h)
-#         else:
-#             rect = self.rect
+def draw_button(screen, text, position, size, color, mouse_pos):
+    pygame.draw.rect(screen, color, (*position, *size))
+    font = pygame.font.Font(None, 30)
+    text_surf = font.render(text, True, (255, 255, 255))
+    text_rect = text_surf.get_rect(center=(position[0] + size[0] / 2, position[1] + size[1] / 2))
+    screen.blit(text_surf, text_rect)
+    return position[0] <= mouse_pos[0] <= position[0] + size[0] and position[1] <= mouse_pos[1] <= position[1] + size[1]
 
-#         pygame.draw.rect(screen, WHITE, rect, 2)
-#         label = FONT.render(self.text, 1, WHITE)
-#         screen.blit(label, (rect.x + 10, rect.y + 10))
+def get_user_input(screen, prompt):
+    user_input = ''
+    base_font = pygame.font.Font(None, 32)
+    input_rect = pygame.Rect(WIDTH / 2 - 100, HEIGHT / 2, 140, 32)
+    color_active = pygame.Color('lightskyblue3')
+    color_passive = pygame.Color('gray15')
+    color = color_passive
+    active = False
+    while True:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                return None
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                if input_rect.collidepoint(event.pos):
+                    active = not active
+                else:
+                    active = False
+                color = color_active if active else color_passive
+            if event.type == pygame.KEYDOWN:
+                if active:
+                    if event.key == pygame.K_RETURN:
+                        return user_input
+                    elif event.key == pygame.K_BACKSPACE:
+                        user_input = user_input[:-1]
+                    else:
+                        user_input += event.unicode
 
-#     def clicked(self, pos):
-#         return self.rect.collidepoint(pos)
+        screen.fill((0, 0, 0))
+        text_surface = base_font.render(prompt + user_input, True, (255, 255, 255))
+        screen.blit(text_surface, (input_rect.x + 5, input_rect.y + 5))
+        pygame.draw.rect(screen, color, input_rect, 2)
+        pygame.display.flip()
+
+
+def main_menu(screen):
+    running = True
+    while running:
+        mouse_pos = pygame.mouse.get_pos()
+        screen.fill((0, 0, 0))
+        if draw_button(screen, "Simple Mode", (WIDTH / 2 - 100, HEIGHT / 2 - 60), (200, 50), (70, 130, 180), mouse_pos):
+            if pygame.mouse.get_pressed()[0]:
+                return "simple"
+        if draw_button(screen, "CyberBit Mode", (WIDTH / 2 - 100, HEIGHT / 2), (200, 50), (70, 130, 180), mouse_pos):
+            if pygame.mouse.get_pressed()[0]:
+                return "cyberbit"
+        pygame.display.flip()
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                running = False
+                pygame.quit()
+                exit()
+
+
+def cyberbit_mode_config(screen):
+    encryption_options = ["128bit", "256bit", "512bit", "1024bit"]
+    selected_option = None
+    while selected_option is None:
+        mouse_pos = pygame.mouse.get_pos()
+        screen.fill((0, 0, 0))
+        for i, option in enumerate(encryption_options):
+            if draw_button(screen, option + " CyberKeys Encryption", (WIDTH / 2 - 100, 100 + i * 60), (200, 50), (70, 130, 180), mouse_pos):
+                if pygame.mouse.get_pressed()[0]:
+                    selected_option = option
+                    break
+        pygame.display.flip()
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                exit()
+
+    limit = get_user_input(screen, "Enter limit quantity (0 for no limit): ")
+    return selected_option, limit
+
+
+def generate_and_save_keys(encryption_option, limit):
+    directory_name = f"{encryption_option}bit CNK"
+    if not os.path.exists(directory_name):
+        os.makedirs(directory_name)
+    now = datetime.datetime.now()
+    date_str = now.strftime("%Y-%m-%d")
+    for i in range(limit or 1):  # If limit is 0, generate at least one key
+        key_data = "Your key generation logic here"
+        file_name = f"{directory_name}/{encryption_option}bit.{date_str}.{i}.ky"
+        with open(file_name, 'w') as file:
+            file.write(key_data)
+
 recording_counter = 0
 background_noise = None
 background_noise_duration = 5 
+
+
+
 def main():
-    
+    pygame.init()
     screen = pygame.display.set_mode((WIDTH, HEIGHT))
     pygame.display.set_caption('Matrix Rain with Voice Waveform and Audio Recording')
     clock = pygame.time.Clock()
-    audio_buffer = b''  # An empty byte string
 
+    # Mode selection
+    mode = main_menu(screen)
+
+    if mode == "cyberbit":
+        option, limit = cyberbit_mode_config(screen)
+        limit = int(limit) if limit.isdigit() else 0
+        generate_and_save_keys(option, limit)
+        print(f"CyberBit Mode selected with option {option} and limit {limit}")
+        # Assuming CyberBit mode does not proceed with the main interactive part
+        pygame.quit()
+        return
+
+    # Simple Mode continues with the existing functionality
+    audio_buffer = b''  # An empty byte string
     columns = [Column(x, random.randint(-HEIGHT, -FONT_SIZE)) for x in range(0, WIDTH, 15)]
     raining = False
     audio_data = np.array([0]*WIDTH)  # Initialize with zeros
     previous_audio_data = np.array([0]*1024)  # Initialize with zeros
-    
 
-    # start_recording_btn = Button(10, HEIGHT - 40, 120, 30, "Start Recording")
-    # custom_timer_btn = Button(140, HEIGHT - 40, 200, 30, "Custom Timer")
     split_screen = False
-    # split_screen_btn = Button(350, HEIGHT - 40, 200, 30, "Split Screen")
     is_recording = False
     recorded_frames = []
     start_time = None
     custom_duration = None
     global recording_counter
-    # Add these variables before the main loop
+
     is_recording = False
     recorded_frames = []
     recording_start_time = None
     filename_prefix = "recording_"
-    
-    
 
     def audio_callback(in_data, frame_count, time_info, status):
-        global recording_counter  # Declare recording_counter as global
         nonlocal raining, audio_data, audio_buffer, previous_audio_data, is_recording, recorded_frames, recording_start_time
-        audio_buffer = in_data  # Storing the raw audio data for later usage
+        audio_buffer = in_data
         current_audio_data = np.frombuffer(in_data, dtype=np.int16)
         current_audio_data = np.interp(current_audio_data, (current_audio_data.min(), current_audio_data.max()), (-HEIGHT//4, HEIGHT//4))
-        audio_data = (previous_audio_data + current_audio_data) / 2  # Average current and previous frame's audio data
-        previous_audio_data = current_audio_data  # Store current frame's audio data for next frame
+        audio_data = (previous_audio_data + current_audio_data) / 2
+        previous_audio_data = current_audio_data
         volume = np.linalg.norm(audio_data)
         if volume > THRESHOLD:
             raining = True
-            if not is_recording:  # Start recording if not already recording
+            if not is_recording:
                 is_recording = True
-                recorded_frames = []  # Clear previous frames
-                recording_start_time = time.time()  # Add this line
+                recorded_frames = []
+                recording_start_time = time.time()
         else:
             raining = False
-            audio_data = np.array([0]*WIDTH)  # Reset to flatline when quiet
-            if is_recording:  # Stop recording if currently recording
+            audio_data = np.array([0]*WIDTH)
+            if is_recording:
                 is_recording = False
-                recording_duration = time.time() - recording_start_time  # Calculate recording duration
-                if recording_duration >= 0.2:  # Only save if recording is at least 0.06 seconds long
-                    # Get current time
-                    now = datetime.datetime.now()
-                    timestamp = now.strftime("%H_%M_%S") + "_" + now.strftime("%f")[:3]
-                    # Save recording to a file
-                    # filename = timestamp + ".wav"
-                    # with wave.open(filename, 'wb') as wf:
-                    #     wf.setnchannels(1)
-                    #     wf.setsampwidth(p.get_sample_size(pyaudio.paInt16))
-                    #     wf.setframerate(44100)
-                    #     wf.writeframes(b''.join(recorded_frames))
-                    # Save binary data to a file
-                    binary_filename = "recordings/" + timestamp + ".ky"
-                    with open(binary_filename, 'w') as bf:  # Open file in text mode
-                        for frame in recorded_frames:
-                            binary_string = ''.join(f'{byte:08b}' for byte in frame)  # Convert byte string to binary string
-                            bf.write(binary_string)
-                    # Convert binary data back to wav file
-                    converted_filename = "recordings/" + timestamp + "_converted.wav"
-                    with open(binary_filename, 'r') as bf, wave.open(converted_filename, 'wb') as wf:
-                        binary_string = bf.read()
-                        byte_string = bytes(int(binary_string[i:i+8], 2) for i in range(0, len(binary_string), 8))
-                        wf.setnchannels(1)
-                        wf.setsampwidth(p.get_sample_size(pyaudio.paInt16))
-                        wf.setframerate(44100)
-                        wf.writeframes(byte_string)
-                    recording_counter += 1
+                recording_duration = time.time() - recording_start_time
+                if recording_duration >= 0.2:
+                    save_recording(recorded_frames)
         if is_recording:
             recorded_frames.append(in_data)
         return (in_data, pyaudio.paContinue)
 
-
     p, stream = get_audio_input_stream(audio_callback)
     stream.start_stream()
-    
+
     running = True
     while running:
-       
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
             if event.type == pygame.MOUSEBUTTONDOWN:
                 pos = pygame.mouse.get_pos()
-                # if start_recording_btn.clicked(pos):
-                #     if is_recording:  # Stop recording
-                #         is_recording = False
-                #         filename = input("Enter a name for the recording: ") + ".wav"
-                #         with wave.open(filename, 'wb') as wf:
-                #             wf.setnchannels(1)
-                #             wf.setsampwidth(p.get_sample_size(pyaudio.paInt16))
-                #             wf.setframerate(44100)
-                #             wf.writeframes(b''.join(recorded_frames))
-                #         recorded_frames.clear()
-                #         start_recording_btn.text = "Start Recording"
-                #     else:  # Start recording
-                #         is_recording = True
-                #         start_recording_btn.text = "Stop Recording"
-                # elif custom_timer_btn.clicked(pos):
-                #     mins = float(input("Enter duration in minutes: "))
-                #     custom_duration = mins * 60  # Convert to seconds
-                #     start_time = pygame.time.get_ticks()
-                #     is_recording = True
-                # elif split_screen_btn.clicked(pos):
-                #     split_screen = not split_screen  # Toggle split_screen
-        if is_recording:
-            if audio_buffer:
-                recorded_frames.append(audio_buffer)
+        if is_recording and audio_buffer:
+            recorded_frames.append(audio_buffer)
         screen.fill(BLACK)
         
+        if not is_recording and recorded_frames:
+            save_recording(recorded_frames, p)
+            recorded_frames = []  # Clear recorded frames after saving
+
         for col in columns:
             col.update(raining, split_screen)
             col.draw(screen, split_screen)
 
-        draw_waveform(screen, audio_data, raining,split_screen)
+        draw_waveform(screen, audio_data, raining, split_screen)
 
-        if is_recording and raining:
-            if audio_buffer:
-                recorded_frames.append(audio_buffer)
-
-
-        if custom_duration and (pygame.time.get_ticks() - start_time) / 1000 > custom_duration:
-            custom_duration = None
-            start_time = None
-            is_recording = False
-            filename = input("Enter a name for the recording: ") + ".wav"
-            with wave.open(filename, 'wb') as wf:
-                wf.setnchannels(1)
-                wf.setsampwidth(p.get_sample_size(pyaudio.paInt16))
-                wf.setframerate(44100)
-                wf.writeframes(b''.join(recorded_frames))
-            recorded_frames.clear()
-        #     start_recording_btn.text = "Start Recording"
-
-        # start_recording_btn.draw(screen, split_screen)
-        # custom_timer_btn.draw(screen, split_screen)
-        # split_screen_btn.draw(screen, split_screen)  # Add this line
         pygame.display.flip()
         clock.tick(20)
 
@@ -283,6 +305,18 @@ def main():
     stream.close()
     p.terminate()
     pygame.quit()
+
+def save_recording(recorded_frames,p):
+    now = datetime.datetime.now()
+    timestamp = now.strftime("%Y%m%d_%H%M%S")
+    filename = f"recordings/{timestamp}.wav"
+    os.makedirs(os.path.dirname(filename), exist_ok=True)
+    with wave.open(filename, 'wb') as wf:
+        wf.setnchannels(1)
+        wf.setsampwidth(p.get_sample_size(pyaudio.paInt16))
+        wf.setframerate(44100)
+        wf.writeframes(b''.join(recorded_frames))
+    print(f"Recording saved as {filename}")
 
 if __name__ == "__main__":
     main()
