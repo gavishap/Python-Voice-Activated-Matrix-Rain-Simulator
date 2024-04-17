@@ -174,7 +174,7 @@ def main_menu(screen):
 
 def cyberbit_mode_config(screen):
     encryption_options = ["128bit", "256bit", "512bit", "1024bit"]
-    selected_option = None
+    selected_option, limit = None, None
     while selected_option is None:
         mouse_pos = pygame.mouse.get_pos()
         screen.fill((0, 0, 0))
@@ -190,7 +190,7 @@ def cyberbit_mode_config(screen):
                 exit()
 
     limit = get_user_input(screen, "Enter limit quantity (0 for no limit): ")
-    return selected_option, limit
+    return selected_option, int(limit) if limit.isdigit() else 0
 
 
 def generate_and_save_keys(encryption_option, limit):
@@ -212,99 +212,93 @@ background_noise_duration = 5
 
 
 def main():
-    pygame.init()
-    screen = pygame.display.set_mode((WIDTH, HEIGHT))
-    pygame.display.set_caption('Matrix Rain with Voice Waveform and Audio Recording')
-    clock = pygame.time.Clock()
+    pygame.init()  # Initialize all imported pygame modules
+    screen = pygame.display.set_mode((WIDTH, HEIGHT))  # Set up the window for display
+    pygame.display.set_caption('Matrix Rain with Voice Waveform and Audio Recording')  # Set the current window caption
+    clock = pygame.time.Clock()  # Create an object to help track time
 
     # Mode selection
-    mode = main_menu(screen)
+    mode = main_menu(screen)  # Display the main menu and get the selected mode
+    bit_option, max_files, bit_limit = None, None, None  # Initialize variables for cyberbit mode configuration
 
     if mode == "cyberbit":
-        option, limit = cyberbit_mode_config(screen)
-        limit = int(limit) if limit.isdigit() else 0
-        generate_and_save_keys(option, limit)
-        print(f"CyberBit Mode selected with option {option} and limit {limit}")
-        # Assuming CyberBit mode does not proceed with the main interactive part
-        pygame.quit()
-        return
+        bit_option, max_files = cyberbit_mode_config(screen)  # Get cyberbit mode configuration
+        bit_limit = int(bit_option.replace('bit', '')) * 8  # Calculate the bit limit from the selected option
+        print(f"CyberBit Mode selected with option {bit_option} and limit {max_files} files")
+    else:
+        print("Simple Mode selected")  # Print the selected mode if not cyberbit
 
-    # Simple Mode continues with the existing functionality
-    audio_buffer = b''  # An empty byte string
-    columns = [Column(x, random.randint(-HEIGHT, -FONT_SIZE)) for x in range(0, WIDTH, 15)]
-    raining = False
-    audio_data = np.array([0]*WIDTH)  # Initialize with zeros
-    previous_audio_data = np.array([0]*1024)  # Initialize with zeros
+    # Common setup for both modes
+    audio_buffer = b''  # Initialize an empty byte string for audio buffer
+    columns = [Column(x, random.randint(-HEIGHT, -FONT_SIZE)) for x in range(0, WIDTH, 15)]  # Create matrix rain columns
+    raining = False  # Initialize raining effect as False
+    audio_data = np.array([0]*WIDTH)  # Initialize audio data array with zeros
+    previous_audio_data = np.array([0]*1024)  # Initialize previous audio data array with zeros
 
-    split_screen = False
-    is_recording = False
-    recorded_frames = []
-    start_time = None
-    custom_duration = None
-    global recording_counter
-
-    is_recording = False
-    recorded_frames = []
-    recording_start_time = None
-    filename_prefix = "recording_"
+    split_screen = False  # Initialize split screen mode as False
+    is_recording = False  # Initialize recording state as False
+    recorded_frames = []  # Initialize list to store recorded frames
+    recording_counter = 0  # Initialize counter for recordings
 
     def audio_callback(in_data, frame_count, time_info, status):
-        nonlocal raining, audio_data, audio_buffer, previous_audio_data, is_recording, recorded_frames, recording_start_time
-        audio_buffer = in_data
-        current_audio_data = np.frombuffer(in_data, dtype=np.int16)
+        nonlocal raining, audio_data, audio_buffer, previous_audio_data, is_recording, recorded_frames, recording_counter
+        audio_buffer = in_data  # Store the current frame of audio data
+        current_audio_data = np.frombuffer(in_data, dtype=np.int16)  # Convert audio buffer to numpy array
+        # Normalize audio data to fit within the height of the window
         current_audio_data = np.interp(current_audio_data, (current_audio_data.min(), current_audio_data.max()), (-HEIGHT//4, HEIGHT//4))
-        audio_data = (previous_audio_data + current_audio_data) / 2
-        previous_audio_data = current_audio_data
-        volume = np.linalg.norm(audio_data)
-        if volume > THRESHOLD:
+        audio_data = (previous_audio_data + current_audio_data) / 2  # Smooth the transition of audio data
+        previous_audio_data = current_audio_data  # Update previous audio data
+        volume = np.linalg.norm(audio_data)  # Calculate the volume of the current audio data
+        if volume > THRESHOLD:  # Check if the volume exceeds the threshold to start raining
             raining = True
-            if not is_recording:
+            if not is_recording:  # Start recording if not already recording
                 is_recording = True
-                recorded_frames = []
-                recording_start_time = time.time()
+                recorded_frames = []  # Reset recorded frames list
         else:
-            raining = False
-            audio_data = np.array([0]*WIDTH)
-            if is_recording:
+            raining = False  # Stop raining effect
+            audio_data = np.array([0]*WIDTH)  # Reset audio data
+            if is_recording:  # Stop recording
                 is_recording = False
-                recording_duration = time.time() - recording_start_time
-                if recording_duration >= 0.2:
-                    save_recording(recorded_frames)
+                if bit_option:  # Check if in Cyberbits mode
+                    total_bits = len(b''.join(recorded_frames)) * 8  # Calculate total bits recorded
+                    if total_bits >= bit_limit or recording_counter >= max_files:  # Check if limits are reached
+                        save_recording(recorded_frames,p)  # Save the recording
+                        recorded_frames = []  # Reset recorded frames list
+                        recording_counter += 1  # Increment recording counter
+                        if recording_counter >= max_files:  # Check if max files limit is reached
+                            return (None, pyaudio.paComplete)  # Stop recording
+                else:
+                    save_recording(recorded_frames,p)  # Save recording in Simple mode
+                    recorded_frames = []  # Reset recorded frames list
         if is_recording:
-            recorded_frames.append(in_data)
-        return (in_data, pyaudio.paContinue)
+            recorded_frames.append(in_data)  # Append current audio data to recorded frames
+        return (in_data, pyaudio.paContinue)  # Continue recording
 
-    p, stream = get_audio_input_stream(audio_callback)
-    stream.start_stream()
+    p, stream = get_audio_input_stream(audio_callback)  # Get the audio input stream and start it
+    stream.start_stream()  # Start the audio stream
 
     running = True
-    while running:
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                running = False
-            if event.type == pygame.MOUSEBUTTONDOWN:
-                pos = pygame.mouse.get_pos()
-        if is_recording and audio_buffer:
-            recorded_frames.append(audio_buffer)
-        screen.fill(BLACK)
-        
-        if not is_recording and recorded_frames:
-            save_recording(recorded_frames, p)
-            recorded_frames = []  # Clear recorded frames after saving
+    while running:  # Main loop
+        for event in pygame.event.get():  # Event handling
+            if event.type == pygame.QUIT:  # Check for window close button
+                running = False  # Stop the loop
 
-        for col in columns:
+        screen.fill(BLACK)  # Fill the screen with black
+
+        for col in columns:  # Update and draw each column
             col.update(raining, split_screen)
             col.draw(screen, split_screen)
 
-        draw_waveform(screen, audio_data, raining, split_screen)
+        draw_waveform(screen, audio_data, raining, split_screen)  # Draw the audio waveform
 
-        pygame.display.flip()
-        clock.tick(20)
+        pygame.display.flip()  # Update the full display surface to the screen
+        clock.tick(20)  # Maintain program speed by limiting frames per second
 
-    stream.stop_stream()
-    stream.close()
-    p.terminate()
-    pygame.quit()
+    stream.stop_stream()  # Stop the audio stream
+    stream.close()  # Close the audio stream
+    p.terminate()  # Terminate the PyAudio session
+    pygame.quit()  # Uninitialize all pygame modules
+
 
 def save_recording(recorded_frames,p):
     now = datetime.datetime.now()
