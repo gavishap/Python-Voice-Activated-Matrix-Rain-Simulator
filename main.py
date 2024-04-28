@@ -249,7 +249,7 @@ def main():
     filename_prefix = "recording_"
 
     def audio_callback(in_data, frame_count, time_info, status):
-        nonlocal raining, audio_data, audio_buffer, previous_audio_data, is_recording, recorded_frames, recording_start_time
+        nonlocal p,raining, audio_data, audio_buffer, previous_audio_data, is_recording, recorded_frames, recording_start_time
         audio_buffer = in_data
         current_audio_data = np.frombuffer(in_data, dtype=np.int16)
         current_audio_data = np.interp(current_audio_data, (current_audio_data.min(), current_audio_data.max()), (-HEIGHT//4, HEIGHT//4))
@@ -266,10 +266,10 @@ def main():
             raining = False
             audio_data = np.array([0]*WIDTH)
             if is_recording:
-                is_recording = False
+                is_recording = False  
                 recording_duration = time.time() - recording_start_time
                 if recording_duration >= 0.2:
-                    save_recording(recorded_frames)
+                    save_recording(recorded_frames,p)
         if is_recording:
             recorded_frames.append(in_data)
         return (in_data, pyaudio.paContinue)
@@ -309,14 +309,26 @@ def main():
 def save_recording(recorded_frames,p):
     now = datetime.datetime.now()
     timestamp = now.strftime("%Y%m%d_%H%M%S")
-    filename = f"recordings/{timestamp}.wav"
-    os.makedirs(os.path.dirname(filename), exist_ok=True)
-    with wave.open(filename, 'wb') as wf:
+    wav_filename = f"recordings/{timestamp}.wav"
+    bin_filename = f"recordings/{timestamp}_binary.txt"  # Filename for binary data
+
+    os.makedirs(os.path.dirname(wav_filename), exist_ok=True)
+
+    # Save WAV file
+    with wave.open(wav_filename, 'wb') as wf:
         wf.setnchannels(1)
         wf.setsampwidth(p.get_sample_size(pyaudio.paInt16))
         wf.setframerate(44100)
         wf.writeframes(b''.join(recorded_frames))
-    print(f"Recording saved as {filename}")
+    print(f"Recording saved as {wav_filename}")
+
+    # Convert audio bytes to binary string and save as TXT file
+    with open(bin_filename, 'w') as bf:
+        for frame in recorded_frames:
+            # Convert each byte to binary and write to file
+            bits = ''.join(f'{byte:08b}' for byte in frame)
+            bf.write(bits + '\n')
+    print(f"Binary data saved as {bin_filename}")
 
 if __name__ == "__main__":
     main()
