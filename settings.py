@@ -15,11 +15,12 @@ WHITE = (255, 255, 255)
 
 
 rainbow_colors = [
-    (148, 0, 211),  # Violet
-    (75, 0, 130),   # Indigo
-    (0, 0, 255),    # Blue
-    (0, 255, 0),    # Green
-    (255, 255, 0),  # Yellow
-    (255, 127, 0),  # Orange
-    (255, 0, 0)     # Red
+    (255, 0, 0),     # Red
+    (255, 127, 0),   # Orange
+    (255, 255, 0),   # Yellow
+    (0, 255, 0),     # Green
+    (173, 216, 230), # Light Blue
+    (0, 0, 255),     # Dark Blue
+    (148, 0, 211),   # Purple
+    (255, 105, 180)  # Pink
 ]
