@@ -11,7 +11,7 @@ class Column:
         self.initial_font_size = random.randint(17, 20)
         self.font_size = self.initial_font_size
         self.should_grow = random.choice([True, False])
-        self.font = pygame.font.Font('DISPLAY FREE TFB.ttf', self.font_size)
+        self.font = pygame.font.Font('Halftone Font.ttf', self.font_size)
         self.symbols = [random.choice(["0", "1"]) for _ in range(random.randint(4, 10))]
         self.growth_timer = pygame.time.get_ticks()
 
@@ -33,18 +33,24 @@ class Column:
         self.y += self.speed
         self.speed += self.speed_increase
         
-        if self.y - len(self.symbols) * self.font_size > HEIGHT and raining:
-            if split_screen:
-                self.x = random.randint(WIDTH // 2, WIDTH)
+        # Check if the column has moved off the screen
+        if self.y - len(self.symbols) * self.font_size > HEIGHT:
+            if raining:  # Only regenerate columns if raining is True
+                if split_screen:
+                    self.x = random.randint(WIDTH // 2, WIDTH)
+                else:
+                    self.x = random.randint(0, WIDTH)
+                self.y = random.randint(-HEIGHT, -self.font_size)
+                self.symbols = [random.choice(["0", "1"]) for _ in range(random.randint(4, 10))]
+                self.font_size = self.initial_font_size
+                self.font = pygame.font.Font('Halftone Font.ttf', self.font_size)
+                self.speed = random.uniform(1, 10)
             else:
-                self.x = random.randint(0, WIDTH)
-            self.y = random.randint(-HEIGHT, -self.font_size)
-            self.symbols = [random.choice(["0", "1"]) for _ in range(random.randint(4, 10))]
-            self.font_size = self.initial_font_size
-            self.font = pygame.font.Font('DISPLAY FREE TFB.ttf', self.font_size)
-            self.speed = random.uniform(1, 10)
+                # If not raining, do not regenerate columns, just let them disappear
+                self.y = HEIGHT + 100  # Move it off-screen permanently
+
         if self.should_grow:
             if pygame.time.get_ticks() - self.growth_timer > 40 and self.font_size < 40:
                 self.font_size += 1
-                self.font = pygame.font.Font('DISPLAY FREE TFB.ttf', self.font_size)
+                self.font = pygame.font.Font('Halftone Font.ttf', self.font_size)
                 self.growth_timer = pygame.time.get_ticks()
